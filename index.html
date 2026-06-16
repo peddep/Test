@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Theory: Algorithm Battle</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1f2937;
+    --border: #374151;
+    --coop: #10b981;
+    --defect: #ef4444;
+    --accent: #6366f1;
+    --accent2: #f59e0b;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(16,185,129,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 48px 20px 32px;
+  }
+  header h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #6366f1 0%, #10b981 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+  }
+  header p {
+    color: var(--muted);
+    font-size: 1.05rem;
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Payoff matrix */
+  .matrix-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .matrix-section h2 { font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+  .matrix {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+  .matrix-cell {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+    font-size: 0.82rem;
+  }
+  .matrix-cell.header { background: transparent; color: var(--muted); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  .matrix-cell .score { font-size: 1.1rem; font-weight: 800; margin-top: 4px; }
+  .matrix-cell.cc .score { color: var(--coop); }
+  .matrix-cell.cd .score { color: var(--defect); }
+  .matrix-cell.dc .score { color: var(--accent2); }
+  .matrix-cell.dd .score { color: var(--muted); }
+  .matrix-legend { font-size: 0.72rem; color: var(--muted); }
+
+  /* Selection area */
+  .selection-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 600px) { .selection-grid { grid-template-columns: 1fr; } }
+
+  .player-panel {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 22px;
+    transition: border-color 0.2s;
+  }
+  .player-panel.p1 { border-color: rgba(99,102,241,0.5); }
+  .player-panel.p2 { border-color: rgba(245,158,11,0.5); }
+  .player-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+  }
+  .p1 .player-label { color: var(--accent); }
+  .p2 .player-label { color: var(--accent2); }
+
+  .algo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .algo-btn {
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text);
+    width: 100%;
+  }
+  .algo-btn:hover { border-color: var(--accent); background: rgba(99,102,241,0.08); }
+  .algo-btn.selected-p1 { border-color: var(--accent); background: rgba(99,102,241,0.15); box-shadow: 0 0 0 1px var(--accent); }
+  .algo-btn.selected-p2 { border-color: var(--accent2); background: rgba(245,158,11,0.12); box-shadow: 0 0 0 1px var(--accent2); }
+  .algo-name { font-weight: 700; font-size: 0.92rem; }
+  .algo-desc { font-size: 0.75rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+  /* VS badge */
+  .vs-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 24px;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  .vs-name { font-size: 1.05rem; font-weight: 700; }
+  .vs-name.p1 { color: var(--accent); }
+  .vs-name.p2 { color: var(--accent2); }
+  .vs-badge { font-size: 1.4rem; font-weight: 900; color: var(--muted); }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .rounds-control { display: flex; align-items: center; gap: 10px; }
+  .rounds-control label { font-size: 0.85rem; color: var(--muted); }
+  .rounds-control input[type=range] {
+    width: 120px;
+    accent-color: var(--accent);
+  }
+  .rounds-val { font-weight: 700; font-size: 0.9rem; min-width: 36px; }
+  .btn-battle {
+    flex: 1;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, var(--accent), #818cf8);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: transform 0.1s, box-shadow 0.2s;
+    min-width: 180px;
+  }
+  .btn-battle:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(99,102,241,0.35); }
+  .btn-battle:active { transform: translateY(1px); }
+  .btn-battle:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+
+  /* Results */
+  .results {
+    display: none;
+  }
+  .results.show { display: block; }
+
+  /* Score cards */
+  .score-cards {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+    align-items: center;
+  }
+  .score-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-card.winner { border-color: var(--coop); box-shadow: 0 0 24px rgba(16,185,129,0.2); }
+  .score-card.loser { border-color: var(--defect); box-shadow: 0 0 16px rgba(239,68,68,0.1); }
+  .score-card.tied { border-color: var(--accent); }
+  .score-card .algo-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .score-card.p1 .algo-label { color: var(--accent); }
+  .score-card.p2 .algo-label { color: var(--accent2); }
+  .score-card .score-big { font-size: 2.6rem; font-weight: 900; line-height: 1; }
+  .score-card.winner .score-big { color: var(--coop); }
+  .score-card.loser .score-big { color: var(--defect); }
+  .score-card.tied .score-big { color: var(--accent); }
+  .score-card .score-name { font-weight: 700; font-size: 1rem; margin-top: 6px; }
+  .score-card .badge { font-size: 0.72rem; margin-top: 8px; padding: 4px 10px; border-radius: 20px; display: inline-block; }
+  .score-card.winner .badge { background: rgba(16,185,129,0.15); color: var(--coop); }
+  .score-card.loser .badge { background: rgba(239,68,68,0.1); color: var(--defect); }
+  .score-card.tied .badge { background: rgba(99,102,241,0.15); color: var(--accent); }
+  .vs-middle { text-align: center; font-size: 1.4rem; font-weight: 900; color: var(--muted); }
+
+  /* Round chart */
+  .chart-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .chart-section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 18px; }
+  #scoreChart { width: 100%; height: 200px; }
+
+  /* Move history */
+  .history-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .history-section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+  .history-scroll {
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .history-track {
+    display: flex;
+    gap: 4px;
+    min-width: max-content;
+  }
+  .history-col { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+  .round-num { font-size: 0.6rem; color: var(--muted); margin-bottom: 2px; }
+  .move-pip {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+  }
+  .move-pip.C { background: rgba(16,185,129,0.2); color: var(--coop); border: 1px solid rgba(16,185,129,0.4); }
+  .move-pip.D { background: rgba(239,68,68,0.2); color: var(--defect); border: 1px solid rgba(239,68,68,0.4); }
+  .history-legend { display: flex; gap: 16px; margin-bottom: 12px; font-size: 0.78rem; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+  .legend-dot.C { background: var(--coop); }
+  .legend-dot.D { background: var(--defect); }
+
+  /* Stats table */
+  .stats-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .stats-section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 16px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .stat-box {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-box .stat-val { font-size: 1.5rem; font-weight: 800; }
+  .stat-box .stat-label { font-size: 0.72rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-box.coop-stat .stat-val { color: var(--coop); }
+  .stat-box.defect-stat .stat-val { color: var(--defect); }
+  .stat-box.round-stat .stat-val { color: var(--accent); }
+  .stat-box.mutual-stat .stat-val { color: var(--accent2); }
+
+  /* Tournament / leaderboard */
+  .tournament-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 48px;
+  }
+  .tournament-section h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+  .tournament-section .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 18px; }
+  .btn-tournament {
+    padding: 11px 24px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 20px;
+  }
+  .btn-tournament:hover { border-color: var(--accent2); color: var(--accent2); }
+  .leaderboard { display: flex; flex-direction: column; gap: 8px; }
+  .lb-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .lb-row.rank-1 { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.06); }
+  .lb-row.rank-2 { border-color: rgba(156,163,175,0.5); }
+  .lb-row.rank-3 { border-color: rgba(180,120,60,0.5); }
+  .lb-rank { font-size: 1rem; font-weight: 800; }
+  .lb-row.rank-1 .lb-rank { color: var(--accent2); }
+  .lb-row.rank-2 .lb-rank { color: #9ca3af; }
+  .lb-row.rank-3 .lb-rank { color: #cd7f32; }
+  .lb-name { font-weight: 700; font-size: 0.92rem; }
+  .lb-name .lb-desc { font-size: 0.72rem; font-weight: 400; color: var(--muted); }
+  .lb-score { font-weight: 800; font-size: 1rem; color: var(--coop); }
+  .lb-wins { font-size: 0.78rem; color: var(--muted); }
+  .lb-bar-wrap { grid-column: 1 / -1; height: 4px; background: var(--border); border-radius: 2px; margin-top: -4px; }
+  .lb-bar { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--coop), var(--accent)); transition: width 0.6s ease; }
+
+  /* Canvas chart */
+  canvas { display: block; }
+
+  /* Fade-in animation */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 0.35s ease forwards; }
+
+  /* Pulse animation for battle button */
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(99,102,241,0); }
+  }
+  .btn-battle:not(:disabled) { animation: pulse 2s infinite; }
+  .btn-battle:hover { animation: none; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Game Theory: Algorithm Battle</h1>
+    <p>The Prisoner's Dilemma — two players each choose to <strong style="color:var(--coop)">Cooperate</strong> or <strong style="color:var(--defect)">Defect</strong>. Strategies clash across many rounds. Which algorithm survives?</p>
+  </header>
+
+  <!-- Payoff Matrix -->
+  <div class="matrix-section">
+    <h2>Payoff Matrix (your score / opponent score)</h2>
+    <div class="matrix">
+      <div class="matrix-cell header"></div>
+      <div class="matrix-cell header">Opp: Cooperate</div>
+      <div class="matrix-cell header">Opp: Defect</div>
+      <div class="matrix-cell header">You: Cooperate</div>
+      <div class="matrix-cell cc">
+        <div>Mutual Gain</div>
+        <div class="score">+3 / +3</div>
+        <div class="matrix-legend">Both rewarded</div>
+      </div>
+      <div class="matrix-cell cd">
+        <div>Betrayed</div>
+        <div class="score">+0 / +5</div>
+        <div class="matrix-legend">Sucker's payoff</div>
+      </div>
+      <div class="matrix-cell header">You: Defect</div>
+      <div class="matrix-cell dc">
+        <div>Exploit</div>
+        <div class="score">+5 / +0</div>
+        <div class="matrix-legend">Temptation</div>
+      </div>
+      <div class="matrix-cell dd">
+        <div>Mutual Loss</div>
+        <div class="score">+1 / +1</div>
+        <div class="matrix-legend">Punishment</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Algorithm Selection -->
+  <div class="selection-grid">
+    <div class="player-panel p1">
+      <div class="player-label">Player 1 — Choose Algorithm</div>
+      <div class="algo-list" id="list1"></div>
+    </div>
+    <div class="player-panel p2">
+      <div class="player-label">Player 2 — Choose Algorithm</div>
+      <div class="algo-list" id="list2"></div>
+    </div>
+  </div>
+
+  <!-- VS Display -->
+  <div class="vs-display">
+    <span class="vs-name p1" id="vsName1">—</span>
+    <span class="vs-badge">VS</span>
+    <span class="vs-name p2" id="vsName2">—</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="rounds-control">
+      <label>Rounds:</label>
+      <input type="range" id="roundsSlider" min="10" max="500" step="10" value="100">
+      <span class="rounds-val" id="roundsVal">100</span>
+    </div>
+    <button class="btn-battle" id="btnBattle" onclick="runBattle()" disabled>⚔ BATTLE</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <!-- Score Cards -->
+    <div class="score-cards" id="scoreCards"></div>
+
+    <!-- Score chart -->
+    <div class="chart-section fade-up">
+      <h3>Cumulative Score Over Rounds</h3>
+      <canvas id="scoreChart"></canvas>
+    </div>
+
+    <!-- Move History -->
+    <div class="history-section fade-up">
+      <h3>Move History</h3>
+      <div class="history-legend">
+        <span><span class="legend-dot C"></span>Cooperate (C)</span>
+        <span><span class="legend-dot D"></span>Defect (D)</span>
+      </div>
+      <div class="history-scroll">
+        <div class="history-track" id="historyTrack"></div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-section fade-up">
+      <h3>Battle Statistics</h3>
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Tournament -->
+  <div class="tournament-section">
+    <h2>Round-Robin Tournament</h2>
+    <p class="sub">Every algorithm battles every other algorithm. See the all-time champion.</p>
+    <button class="btn-tournament" onclick="runTournament()">Run Tournament (100 rounds each)</button>
+    <div class="leaderboard" id="leaderboard"></div>
+  </div>
+</div>
+
+<script>
+// ─── Algorithms ───────────────────────────────────────────────────────────────
+const ALGORITHMS = [
+  {
+    id: 'tft',
+    name: 'Tit for Tat',
+    desc: 'Cooperates first, then mirrors opponent\'s last move. Classic cooperator.',
+    move(history, oppHistory) {
+      if (oppHistory.length === 0) return 'C';
+      return oppHistory[oppHistory.length - 1];
+    }
+  },
+  {
+    id: 'allC',
+    name: 'Always Cooperate',
+    desc: 'Always cooperates, no matter what. Pure altruist.',
+    move() { return 'C'; }
+  },
+  {
+    id: 'allD',
+    name: 'Always Defect',
+    desc: 'Always defects. Ruthless and exploitative.',
+    move() { return 'D'; }
+  },
+  {
+    id: 'random',
+    name: 'Random',
+    desc: 'Flips a coin each round. Completely unpredictable.',
+    move() { return Math.random() < 0.5 ? 'C' : 'D'; }
+  },
+  {
+    id: 'grudger',
+    name: 'Grudger',
+    desc: 'Cooperates until betrayed once, then defects forever. Unforgiving.',
+    move(history, oppHistory) {
+      return oppHistory.includes('D') ? 'D' : 'C';
+    }
+  },
+  {
+    id: 'pavlov',
+    name: 'Pavlov',
+    desc: 'Win-Stay, Lose-Shift. Repeats move if rewarded, switches if punished.',
+    move(history, oppHistory) {
+      if (history.length === 0) return 'C';
+      const myLast = history[history.length - 1];
+      const oppLast = oppHistory[oppHistory.length - 1];
+      const score = getScore(myLast, oppLast);
+      // Win-stay: high score (5 or 3) → repeat; low score (0 or 1) → switch
+      if (score >= 3) return myLast;
+      return myLast === 'C' ? 'D' : 'C';
+    }
+  },
+  {
+    id: 'tf2t',
+    name: 'Tit for Two Tats',
+    desc: 'Defects only after two consecutive defections. More forgiving than TFT.',
+    move(history, oppHistory) {
+      if (oppHistory.length < 2) return 'C';
+      const last2 = oppHistory.slice(-2);
+      return (last2[0] === 'D' && last2[1] === 'D') ? 'D' : 'C';
+    }
+  },
+  {
+    id: 'generous',
+    name: 'Generous TFT',
+    desc: 'Like Tit for Tat, but occasionally forgives a defection (10% chance).',
+    move(history, oppHistory) {
+      if (oppHistory.length === 0) return 'C';
+      const oppLast = oppHistory[oppHistory.length - 1];
+      if (oppLast === 'D' && Math.random() < 0.1) return 'C';
+      return oppLast;
+    }
+  },
+  {
+    id: 'detective',
+    name: 'Detective',
+    desc: 'Probes with C,D,C,C then plays TFT if opponent retaliated, else Always Defect.',
+    move(history, oppHistory) {
+      const probe = ['C','D','C','C'];
+      if (history.length < 4) return probe[history.length];
+      // Check if opponent ever retaliated
+      const retaliated = oppHistory.slice(0,4).includes('D');
+      if (retaliated) {
+        return oppHistory[oppHistory.length - 1]; // TFT
+      }
+      return 'D'; // exploit
+    }
+  },
+  {
+    id: 'cooperate_random',
+    name: 'Mostly Cooperate',
+    desc: 'Cooperates 85% of the time, defects randomly 15%. Mostly trustworthy.',
+    move() { return Math.random() < 0.85 ? 'C' : 'D'; }
+  }
+];
+
+// ─── Payoff ────────────────────────────────────────────────────────────────────
+function getScore(myMove, oppMove) {
+  if (myMove === 'C' && oppMove === 'C') return 3;
+  if (myMove === 'C' && oppMove === 'D') return 0;
+  if (myMove === 'D' && oppMove === 'C') return 5;
+  return 1; // D vs D
+}
+
+// ─── State ─────────────────────────────────────────────────────────────────────
+let selectedP1 = null;
+let selectedP2 = null;
+
+// ─── Build algorithm lists ─────────────────────────────────────────────────────
+function buildLists() {
+  ['list1','list2'].forEach((listId, pi) => {
+    const el = document.getElementById(listId);
+    el.innerHTML = '';
+    ALGORITHMS.forEach(algo => {
+      const btn = document.createElement('button');
+      btn.className = 'algo-btn';
+      btn.innerHTML = `<div class="algo-name">${algo.name}</div><div class="algo-desc">${algo.desc}</div>`;
+      btn.onclick = () => selectAlgo(pi + 1, algo.id);
+      btn.dataset.id = algo.id;
+      el.appendChild(btn);
+    });
+  });
+}
+
+function selectAlgo(player, algoId) {
+  if (player === 1) selectedP1 = algoId;
+  else selectedP2 = algoId;
+  refreshSelection();
+}
+
+function refreshSelection() {
+  document.querySelectorAll('#list1 .algo-btn, #list2 .algo-btn').forEach(btn => {
+    btn.classList.remove('selected-p1','selected-p2');
+  });
+  if (selectedP1) {
+    document.querySelectorAll(`#list1 .algo-btn[data-id="${selectedP1}"]`).forEach(b => b.classList.add('selected-p1'));
+    document.querySelectorAll(`#list2 .algo-btn[data-id="${selectedP1}"]`).forEach(b => b.classList.add('selected-p1'));
+  }
+  if (selectedP2) {
+    document.querySelectorAll(`#list1 .algo-btn[data-id="${selectedP2}"]`).forEach(b => b.classList.add('selected-p2'));
+    document.querySelectorAll(`#list2 .algo-btn[data-id="${selectedP2}"]`).forEach(b => b.classList.add('selected-p2'));
+  }
+
+  const a1 = ALGORITHMS.find(a => a.id === selectedP1);
+  const a2 = ALGORITHMS.find(a => a.id === selectedP2);
+  document.getElementById('vsName1').textContent = a1 ? a1.name : '—';
+  document.getElementById('vsName2').textContent = a2 ? a2.name : '—';
+
+  const canBattle = selectedP1 && selectedP2;
+  document.getElementById('btnBattle').disabled = !canBattle;
+}
+
+// ─── Simulate one match ────────────────────────────────────────────────────────
+function simulateMatch(algo1, algo2, rounds) {
+  const h1 = [], h2 = [];
+  const s1 = [], s2 = [];
+  let cum1 = 0, cum2 = 0;
+  const cumulative1 = [], cumulative2 = [];
+
+  for (let r = 0; r < rounds; r++) {
+    const m1 = algo1.move([...h1], [...h2]);
+    const m2 = algo2.move([...h2], [...h1]);
+    h1.push(m1); h2.push(m2);
+    const score1 = getScore(m1, m2);
+    const score2 = getScore(m2, m1);
+    s1.push(score1); s2.push(score2);
+    cum1 += score1; cum2 += score2;
+    cumulative1.push(cum1);
+    cumulative2.push(cum2);
+  }
+  return { h1, h2, s1, s2, cumulative1, cumulative2, total1: cum1, total2: cum2 };
+}
+
+// ─── Battle ────────────────────────────────────────────────────────────────────
+function runBattle() {
+  if (!selectedP1 || !selectedP2) return;
+  const rounds = parseInt(document.getElementById('roundsSlider').value);
+  const algo1 = ALGORITHMS.find(a => a.id === selectedP1);
+  const algo2 = ALGORITHMS.find(a => a.id === selectedP2);
+
+  const result = simulateMatch(algo1, algo2, rounds);
+  renderResults(algo1, algo2, result, rounds);
+}
+
+function renderResults(algo1, algo2, result, rounds) {
+  const el = document.getElementById('results');
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const t1 = result.total1, t2 = result.total2;
+  const tie = t1 === t2;
+
+  // Score cards
+  let p1Class = tie ? 'tied' : (t1 > t2 ? 'winner' : 'loser');
+  let p2Class = tie ? 'tied' : (t2 > t1 ? 'winner' : 'loser');
+  let p1Badge = tie ? 'Tied' : (t1 > t2 ? '🏆 Winner' : 'Defeated');
+  let p2Badge = tie ? 'Tied' : (t2 > t1 ? '🏆 Winner' : 'Defeated');
+
+  document.getElementById('scoreCards').innerHTML = `
+    <div class="score-card p1 ${p1Class}">
+      <div class="algo-label">Player 1</div>
+      <div class="score-big">${t1}</div>
+      <div class="score-name">${algo1.name}</div>
+      <div class="badge">${p1Badge}</div>
+    </div>
+    <div class="vs-middle">VS</div>
+    <div class="score-card p2 ${p2Class}">
+      <div class="algo-label">Player 2</div>
+      <div class="score-big">${t2}</div>
+      <div class="score-name">${algo2.name}</div>
+      <div class="badge">${p2Badge}</div>
+    </div>
+  `;
+
+  // Stats
+  const mutualC = result.h1.filter((m,i) => m==='C' && result.h2[i]==='C').length;
+  const mutualD = result.h1.filter((m,i) => m==='D' && result.h2[i]==='D').length;
+  const coopRate1 = Math.round(result.h1.filter(m=>m==='C').length / rounds * 100);
+  const coopRate2 = Math.round(result.h2.filter(m=>m==='C').length / rounds * 100);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-box coop-stat">
+      <div class="stat-val">${coopRate1}%</div>
+      <div class="stat-label">${algo1.name} Coop Rate</div>
+    </div>
+    <div class="stat-box coop-stat">
+      <div class="stat-val">${coopRate2}%</div>
+      <div class="stat-label">${algo2.name} Coop Rate</div>
+    </div>
+    <div class="stat-box mutual-stat">
+      <div class="stat-val">${mutualC}</div>
+      <div class="stat-label">Mutual Cooperations</div>
+    </div>
+    <div class="stat-box defect-stat">
+      <div class="stat-val">${mutualD}</div>
+      <div class="stat-label">Mutual Defections</div>
+    </div>
+    <div class="stat-box round-stat">
+      <div class="stat-val">${rounds}</div>
+      <div class="stat-label">Total Rounds</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val">${t1+t2}</div>
+      <div class="stat-label">Combined Score</div>
+    </div>
+  `;
+
+  // Move history (show max 80 rounds visually)
+  const show = Math.min(rounds, 80);
+  const track = document.getElementById('historyTrack');
+  track.innerHTML = '';
+  for (let i = 0; i < show; i++) {
+    const col = document.createElement('div');
+    col.className = 'history-col';
+    col.innerHTML = `
+      <div class="round-num">${i+1}</div>
+      <div class="move-pip ${result.h1[i]}" title="P1 ${result.h1[i]==='C'?'Cooperate':'Defect'}">${result.h1[i]}</div>
+      <div class="move-pip ${result.h2[i]}" title="P2 ${result.h2[i]==='C'?'Cooperate':'Defect'}">${result.h2[i]}</div>
+    `;
+    track.appendChild(col);
+  }
+
+  // Chart
+  drawChart(result, algo1, algo2, rounds);
+}
+
+// ─── Canvas Chart ──────────────────────────────────────────────────────────────
+function drawChart(result, algo1, algo2, rounds) {
+  const canvas = document.getElementById('scoreChart');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 48;
+  const H = 200;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 10, right: 20, bottom: 30, left: 50 };
+  const w = W - pad.left - pad.right;
+  const h = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const maxScore = Math.max(...result.cumulative1, ...result.cumulative2);
+  const step = Math.max(1, Math.floor(rounds / 100));
+
+  function xPos(i) { return pad.left + (i / (rounds - 1)) * w; }
+  function yPos(v) { return pad.top + h - (v / maxScore) * h; }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(55,65,81,0.6)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (h / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + w, y);
+    ctx.stroke();
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(maxScore * (1 - i/4)), pad.left - 6, y + 4);
+  }
+
+  // X axis labels
+  ctx.fillStyle = '#6b7280';
+  ctx.textAlign = 'center';
+  ctx.font = '10px system-ui';
+  for (let i = 0; i <= 4; i++) {
+    const x = pad.left + (w / 4) * i;
+    ctx.fillText(Math.round((rounds / 4) * i), x, pad.top + h + 18);
+  }
+
+  // Draw lines
+  function drawLine(data, color) {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < rounds; i += step) {
+      const x = xPos(i), y = yPos(data[i]);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Gradient fill for P1
+  function fillGradient(data, color) {
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + h);
+    grad.addColorStop(0, color + '33');
+    grad.addColorStop(1, color + '00');
+    ctx.beginPath();
+    ctx.fillStyle = grad;
+    for (let i = 0; i < rounds; i += step) {
+      const x = xPos(i), y = yPos(data[i]);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.lineTo(pad.left + w, pad.top + h);
+    ctx.lineTo(pad.left, pad.top + h);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  fillGradient(result.cumulative1, '#6366f1');
+  fillGradient(result.cumulative2, '#f59e0b');
+  drawLine(result.cumulative1, '#6366f1');
+  drawLine(result.cumulative2, '#f59e0b');
+
+  // Legend
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'left';
+  [[algo1.name, '#6366f1', 14], [algo2.name, '#f59e0b', W/2 + 10]].forEach(([name, color, x]) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, 8, 14, 4);
+    ctx.fillStyle = '#d1d5db';
+    ctx.fillText(name, x + 18, 14);
+  });
+}
+
+// ─── Tournament ────────────────────────────────────────────────────────────────
+function runTournament() {
+  const rounds = 100;
+  const scores = {};
+  const wins = {};
+  ALGORITHMS.forEach(a => { scores[a.id] = 0; wins[a.id] = 0; });
+
+  for (let i = 0; i < ALGORITHMS.length; i++) {
+    for (let j = i + 1; j < ALGORITHMS.length; j++) {
+      const a1 = ALGORITHMS[i], a2 = ALGORITHMS[j];
+      const result = simulateMatch(a1, a2, rounds);
+      scores[a1.id] += result.total1;
+      scores[a2.id] += result.total2;
+      if (result.total1 > result.total2) wins[a1.id]++;
+      else if (result.total2 > result.total1) wins[a2.id]++;
+    }
+  }
+
+  const sorted = [...ALGORITHMS].sort((a, b) => scores[b.id] - scores[a.id]);
+  const maxScore = scores[sorted[0].id];
+
+  const lb = document.getElementById('leaderboard');
+  lb.innerHTML = sorted.map((algo, idx) => {
+    const rank = idx + 1;
+    const pct = Math.round(scores[algo.id] / maxScore * 100);
+    const rankClass = rank <= 3 ? `rank-${rank}` : '';
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+    return `
+      <div class="lb-row ${rankClass}">
+        <div class="lb-rank">${medal || '#'+rank}</div>
+        <div class="lb-name">${algo.name}<div class="lb-desc">${algo.desc}</div></div>
+        <div class="lb-score">${scores[algo.id]}</div>
+        <div class="lb-wins">${wins[algo.id]}W</div>
+        <div class="lb-bar-wrap"><div class="lb-bar" style="width:${pct}%"></div></div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('roundsSlider').addEventListener('input', function() {
+  document.getElementById('roundsVal').textContent = this.value;
+});
+
+buildLists();
+
+// Default selections
+selectAlgo(1, 'tft');
+selectAlgo(2, 'allD');
+</script>
+</body>
+</html>
